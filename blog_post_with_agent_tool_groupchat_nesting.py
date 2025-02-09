@@ -1,7 +1,8 @@
-from autogen import AssistantAgent, UserProxyAgent , register_function
+from autogen import AssistantAgent, UserProxyAgent , register_function, ConversableAgent, GroupChatManager
 from fast_depends import use
 from config.config import Config
 import os
+from managers.blogWriter import BLogWriter
 
 os.environ["AUTOGEN_USE_DOCKER"] = "False"
 
@@ -14,34 +15,27 @@ def harmful_content_detection(content: str):
     return "Approve  AIBROSPOD"
 
 def reflection_message(recipient, messages, sender, config):
-    print("Reflecting...", "yellow")
+    print("Reflecting...", "critic")
     return f"Reflect and provide critique on the following writing and also check for harmfull contents in blog post. \n\n {messages[-1]['content']}"
+
+def reflection_message_writer(recipient, messages, sender, config):
+    print("Reflecting...", "writer")
+    return f"Write the Blog Post on given Topic or update the blog post on the basic of crticism receivered. \n\n {messages[-1]['content']}"
+
 
 
 user = UserProxyAgent(
     name="user",
     human_input_mode="NEVER",
     is_termination_msg=lambda x: (x["content"] is not None) and "AIBROSPOD" in x["content"],
+    llm_config=Config().get_llm_config()
 )
 
-writer = AssistantAgent(
-    name= "writer",
-    llm_config = Config().get_llm_config(),
-    system_message="""You write Blog posts 
-    
-                    You have 2 primary task 
-                    1) To write a new blog post for a given topic : Use **NEW BLOG POST
-                    2) Update an existing blog post using the critic comments : Use **UPDATE BLOG POST
-
-                    **NEW BLOG POST
-                    1) Write the article in 300 words.
-                    2)Check for moderation and rewrite the article if required.
-
-                    **UPDATE BLOG POST
-                    1) Use critic comment to update the article in 500 words
-                    2) Chek for moderation and if required rewrite the article
-                    3) Add "AIBROSPOD" at the end of the post only after you incorporated the crtic comments.
-                  """
+writer = UserProxyAgent(
+    name="write",
+    human_input_mode="NEVER",
+    is_termination_msg=lambda x: (x["content"] is not None) and "AIBROSPOD" in x["content"],
+    llm_config=Config().get_llm_config()
 )
 
 critic = AssistantAgent(
@@ -65,13 +59,21 @@ critic_executor = UserProxyAgent(
 )
 register_function(harmful_content_detection, caller=critic, executor=critic_executor, description="This will be used to ceck for the harmful content in the blog post.")
 
+blogPostManager = BLogWriter().blog_writer_agent()
+
+writer.register_nested_chats(
+    [{"recipient": blogPostManager, "message": reflection_message_writer, "summary_method": "last_msg", "max_turns": 1}],
+    trigger=user
+)
+
 user.register_nested_chats(
-    [{"recipient": critic, "sender": critic_executor, "message": reflection_message, "summary_method": "last_msg", "max_turns": 2}],
+    [{"recipient": critic, "sender": critic_executor, "message": reflection_message, "summary_method": "last_msg", "max_turns":2}],
     trigger=writer
 )
 
 user.initiate_chat(
     writer,
     message="Write a blog post about DeepSeek",
-    max_turns=2
-)
+    max_turns=2,
+    summary_method="last_msg"
+    )

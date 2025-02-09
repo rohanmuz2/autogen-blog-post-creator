@@ -14,7 +14,7 @@ client = OpenAI(api_key=os.environ.get("OPENAI_KEY"))
 os.environ["AUTOGEN_USE_DOCKER"] = "False"
 
 
-class BLogWriter:
+class BlogPostWithDalleAgent:
     def __init__(self) -> None:
         pass
 
@@ -91,8 +91,8 @@ class BLogWriter:
         allowed_transitions = {
             user: [planner],
             planner: [writer, image_generator],
-            writer: [image_generator],
-            image_generator: [  writer],
+            writer: [planner,image_generator],
+            image_generator: [planner, writer],
         }
         groupChat = GroupChat(
             [planner, user, writer, image_generator],
@@ -112,5 +112,5 @@ class BLogWriter:
         )
 
 
-blog = BLogWriter()
+blog = BlogPostWithDalleAgent()
 blog.write_blog()
