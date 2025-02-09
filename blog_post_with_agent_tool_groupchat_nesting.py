@@ -27,7 +27,7 @@ user = UserProxyAgent(
 writer = AssistantAgent(
     name= "writer",
     llm_config = Config().get_llm_config(),
-    system_message="""You write Blog post write 
+    system_message="""You write Blog posts 
     
                     You have 2 primary task 
                     1) To write a new blog post for a given topic : Use **NEW BLOG POST
